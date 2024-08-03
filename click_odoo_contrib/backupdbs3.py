@@ -146,7 +146,6 @@ def main(env, dbname, dest, force, if_exists, format, filestore):
                 _backup_filestore(dbname, _backup)
             _dump_db(dbname, _backup)
             _backup_s3(dbname, _backup)
-            _backup.delete()
     finally:
         odoo.sql_db.close_db(dbname)
 
