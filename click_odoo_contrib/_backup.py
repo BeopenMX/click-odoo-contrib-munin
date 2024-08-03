@@ -128,10 +128,48 @@ class FolderBackup(AbstractBackup):
         shutil.rmtree(self._path)
 
 
+class S3ZipBackup(ZipBackup):
+    format = "s3zip"
+
+    def __init__(self, path, mode):
+        super().__init__(path, mode)
+        self._zipFile = zipfile.ZipFile(
+            self._path, self._mode, compression=zipfile.ZIP_DEFLATED, allowZip64=True
+        )
+
+    def addtree(self, src, arcname):
+        len_prefix = len(src) + 1
+        for dirpath, _dirnames, filenames in os.walk(src):
+            for fname in filenames:
+                path = os.path.normpath(os.path.join(dirpath, fname))
+                if os.path.isfile(path):
+                    _arcname = os.path.join(arcname, path[len_prefix:])
+                    self._zipFile.write(path, _arcname)
+
+    def addfile(self, filename, arcname):
+        self._zipFile.write(filename, arcname)
+
+    def write(self, stream, arcname):
+        with tempfile.NamedTemporaryFile() as f:
+            shutil.copyfileobj(stream, f)
+            f.seek(0)
+            self._zipFile.write(f.name, arcname)
+
+    def close(self):
+        try:
+            self._zipFile.close()
+        finally:
+            os.unlink(self._path)
+
+    def delete(self):
+        self.close()
+
+
 BACKUP_FORMAT = {
     ZipBackup.format: ZipBackup,
     DumpBackup.format: DumpBackup,
     FolderBackup.format: FolderBackup,
+    S3ZipBackup.format: S3ZipBackup,
 }
 
 

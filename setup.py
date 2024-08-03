@@ -22,6 +22,7 @@ setup(
     setup_requires=["setuptools-scm"],
     install_requires=[
         "click-odoo>=1.3.0",
+        "boto3",
         "manifestoo-core>=0.7",
         "importlib_resources ; python_version<'3.9'",
     ],
@@ -52,6 +53,7 @@ setup(
         click-odoo-initdb=click_odoo_contrib.initdb:main
         click-odoo-listdb=click_odoo_contrib.listdb:main
         click-odoo-backupdb=click_odoo_contrib.backupdb:main
+        click-odoo-backupdbs3=click_odoo_contrib.backupdbs3:main
         click-odoo-restoredb=click_odoo_contrib.restoredb:main
         click-odoo-makepot=click_odoo_contrib.makepot:main
     """,
