@@ -45,7 +45,7 @@ def _backup_filestore(dbname, backup):
         backup.addtree(filestore_source, FILESTORE_DIRNAME)
 
 
-def _backup_s3(dbname, backup):
+def _backup_s3(cr, dbname, backup):
     s3_key = odoo.tools.config.get('s3_key')
     s3_secret = odoo.tools.config.get('s3_secret')
     s3_bucket = odoo.tools.config.get('s3_bucket')
@@ -65,8 +65,19 @@ def _backup_s3(dbname, backup):
     filename = "%s_%s.%s" % (dbname, ts, 'zip')
 
     client.upload_file(backup._path, Bucket=s3_bucket, Key=filename)
+    response = client.head_object(Bucket=s3_bucket, Key=filename)
+    # Get the size in bytes
+    file_size_bytes = response['ContentLength']
+    # Convert size to gigabytes
+    file_size_gb = file_size_bytes / (1024 ** 3)
 
-
+    # Asusme we have s3_backup_created table with name and size
+    cr.execute(
+        "INSERT INTO s3_backup_created (name,size, create_date, write_date)"
+        "VALUES (%s, %s, now() AT TIME ZONE 'UTC', now() AT TIME ZONE 'UTC')",
+        (filename, file_size_gb),
+    )
+    cr.commit()
 
 
 @click.command()
@@ -145,7 +156,7 @@ def main(env, dbname, dest, force, if_exists, format, filestore):
             if filestore:
                 _backup_filestore(dbname, _backup)
             _dump_db(dbname, _backup)
-            _backup_s3(dbname, _backup)
+            _backup_s3(cr, dbname, _backup)
     finally:
         odoo.sql_db.close_db(dbname)
 
