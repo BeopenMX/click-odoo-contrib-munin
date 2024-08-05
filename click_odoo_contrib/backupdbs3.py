@@ -163,7 +163,8 @@ def main(env, dbname, dest, force, if_exists, format, filestore):
             if filestore:
                 _backup_filestore(dbname, _backup)
             _dump_db(dbname, _backup)
-        _backup_s3(cr, dbname, dest)
+        with db.cursor() as cr:
+            _backup_s3(cr, dbname, dest)
     except Exception as e:
         print(e)
     finally:
