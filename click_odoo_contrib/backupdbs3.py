@@ -64,9 +64,9 @@ def _backup_s3(cr, dbname, dest):
                           aws_secret_access_key=s3_secret)
     ts = datetime.datetime.utcnow().strftime("%Y-%m-%d_%H-%M-%S")
     filename = "%s_%s.%s" % (dbname, ts, 'zip')
-
-    client.upload_file(dest, Bucket=s3_bucket, Key=filename)
-    response = client.head_object(Bucket=s3_bucket, Key=filename)
+    pre = "bkdaily/"
+    client.upload_file(dest, Bucket=s3_bucket, Key=pre + filename)
+    response = client.head_object(Bucket=s3_bucket, Key=pre + filename)
     # Get the size in bytes
     file_size_bytes = response['ContentLength']
     # Convert size to gigabytes
