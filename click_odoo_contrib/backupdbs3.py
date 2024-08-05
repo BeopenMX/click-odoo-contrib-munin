@@ -45,7 +45,8 @@ def _backup_filestore(dbname, backup):
         backup.addtree(filestore_source, FILESTORE_DIRNAME)
 
 
-def _backup_s3(cr, dbname, backup):
+def _backup_s3(cr, dbname, dest):
+
     s3_key = odoo.tools.config.get('s3_key')
     s3_secret = odoo.tools.config.get('s3_secret')
     s3_bucket = odoo.tools.config.get('s3_bucket')
@@ -64,7 +65,7 @@ def _backup_s3(cr, dbname, backup):
     ts = datetime.datetime.utcnow().strftime("%Y-%m-%d_%H-%M-%S")
     filename = "%s_%s.%s" % (dbname, ts, 'zip')
 
-    client.upload_file(backup._path, Bucket=s3_bucket, Key=filename)
+    client.upload_file(dest, Bucket=s3_bucket, Key=filename)
     response = client.head_object(Bucket=s3_bucket, Key=filename)
     # Get the size in bytes
     file_size_bytes = response['ContentLength']
@@ -78,6 +79,12 @@ def _backup_s3(cr, dbname, backup):
         (filename, file_size_gb),
     )
     cr.commit()
+    # clean
+    if os.path.exists(dest):
+        if os.path.isfile(dest):
+            os.unlink(dest)
+        else:
+            shutil.rmtree(dest)
 
 
 @click.command()
@@ -156,8 +163,11 @@ def main(env, dbname, dest, force, if_exists, format, filestore):
             if filestore:
                 _backup_filestore(dbname, _backup)
             _dump_db(dbname, _backup)
-            _backup_s3(cr, dbname, _backup)
+        _backup_s3(cr, dbname, dest)
+    except Exception as e:
+        print(e)
     finally:
+
         odoo.sql_db.close_db(dbname)
 
 

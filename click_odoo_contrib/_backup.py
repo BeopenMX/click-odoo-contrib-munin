@@ -169,7 +169,7 @@ BACKUP_FORMAT = {
     ZipBackup.format: ZipBackup,
     DumpBackup.format: DumpBackup,
     FolderBackup.format: FolderBackup,
-    S3ZipBackup.format: S3ZipBackup,
+    S3ZipBackup.format: ZipBackup,
 }
 
 
