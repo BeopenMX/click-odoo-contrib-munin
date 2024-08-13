@@ -13,6 +13,7 @@ import click
 import click_odoo
 from click_odoo import odoo
 
+from odoo.tools import exec_pg_environ
 from ._backup import backup
 from ._dbutils import db_exists, db_management_enabled
 
@@ -32,6 +33,8 @@ def _dump_db(dbname, backup):
         cmd.insert(-1, "--format=c")
         filename = DBDUMP_FILENAME
     _logger.info("PG DUMP CALL:" +str(cmd))
+    env = exec_pg_environ()
+    _logger.info(str(env))
     _stdin, stdout = odoo.tools.exec_pg_command_pipe(*cmd)
     backup.write(stdout, filename)
 
