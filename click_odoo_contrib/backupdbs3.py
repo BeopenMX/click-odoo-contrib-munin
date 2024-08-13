@@ -31,6 +31,7 @@ def _dump_db(dbname, backup):
     if backup.format in {"dump", "folder"}:
         cmd.insert(-1, "--format=c")
         filename = DBDUMP_FILENAME
+    _logger.info("PG DUMP CALL:" +str(cmd))
     _stdin, stdout = odoo.tools.exec_pg_command_pipe(*cmd)
     backup.write(stdout, filename)
 
@@ -55,6 +56,8 @@ def _backup_s3(cr, dbname, dest):
     s3_bucket = odoo.tools.config.get('s3_bucket')
     s3_region = odoo.tools.config.get('s3_region', 'us-east-1')
 
+    _logger.info(str([s3_key, s3_secret, s3_bucket, s3_region]))
+
     my_config = Config(
         region_name=s3_region,
         signature_version='v4',
@@ -68,6 +71,7 @@ def _backup_s3(cr, dbname, dest):
     ts = datetime.datetime.utcnow().strftime("%Y-%m-%d_%H-%M-%S")
     filename = "%s_%s.%s" % (dbname, ts, 'zip')
     pre = "bkdaily/"
+    _logger.info(str([dest, s3_bucket,pre + filename]))
     client.upload_file(dest, Bucket=s3_bucket, Key=pre + filename)
     response = client.head_object(Bucket=s3_bucket, Key=pre + filename)
     # Get the size in bytes
