@@ -166,7 +166,7 @@ def main(env, dbname, dest, force, if_exists, format, filestore):
         with db.cursor() as cr:
             _backup_s3(cr, dbname, dest)
     except Exception as e:
-        with open(f"log-{dest}.txt", "w+") as f:
+        with open(f"{dest.replace('.zip','_log')}.txt", "w+") as f:
             f.write("======================================\n")
             f.write(str(e))
     finally:
