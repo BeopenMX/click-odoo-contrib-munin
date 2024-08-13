@@ -8,7 +8,7 @@ import shutil
 import tempfile
 import boto3
 from botocore.config import Config
-
+import traceback
 import click
 import click_odoo
 from click_odoo import odoo
@@ -19,6 +19,10 @@ from ._dbutils import db_exists, db_management_enabled
 MANIFEST_FILENAME = "manifest.json"
 DBDUMP_FILENAME = "db.dump"
 FILESTORE_DIRNAME = "filestore"
+
+import logging
+
+_logger = logging.getLogger(__name__)
 
 
 def _dump_db(dbname, backup):
@@ -46,7 +50,6 @@ def _backup_filestore(dbname, backup):
 
 
 def _backup_s3(cr, dbname, dest):
-
     s3_key = odoo.tools.config.get('s3_key')
     s3_secret = odoo.tools.config.get('s3_secret')
     s3_bucket = odoo.tools.config.get('s3_bucket')
@@ -165,10 +168,11 @@ def main(env, dbname, dest, force, if_exists, format, filestore):
             _dump_db(dbname, _backup)
         with db.cursor() as cr:
             _backup_s3(cr, dbname, dest)
-    except Exception as e:
-        with open(f"{dest.replace('.zip','_log')}.txt", "w+") as f:
+    except Exception:
+        with open(f"{dest.replace('.zip', '_log')}.txt", "w+") as f:
             f.write("======================================\n")
-            f.write(str(e))
+            f.write(str(traceback.format_exc()))
+            _logger.error(traceback.format_exc())
     finally:
         odoo.sql_db.close_db(dbname)
 
