@@ -5,6 +5,7 @@ import datetime
 import json
 import os
 import shutil
+import subprocess
 import tempfile
 import boto3
 from botocore.config import Config
@@ -26,13 +27,52 @@ import logging
 _logger = logging.getLogger(__name__)
 
 
+def _odoo_basic_backup(cr, dbname, include_filestore=False, zip_filename=None):
+    cmd = ["pg_dump", "--no-owner", dbname]
+    filename = "dump.sql"
+    with tempfile.TemporaryDirectory() as zip_dir:
+        with tempfile.TemporaryDirectory() as dump_dir:
+            cmd.insert(-1, '--file=' + os.path.join(dump_dir, filename))
+            env = exec_pg_environ()
+            _logger.info(str(env))
+            _logger.info(str(cmd))
+            with open(os.path.join(dump_dir, 'manifest.json'), 'w') as fh:
+                manifest = odoo.service.db.dump_db_manifest(cr)
+                json.dump(manifest, fh, indent=4)
+            with open(os.devnull) as dn:
+                args2 = tuple(cmd)
+                rc = subprocess.call(args2, env=env, stdout=dn, stderr=subprocess.STDOUT)
+                if rc:
+                    raise Exception('Postgres subprocess %s error %s' % (args2, rc))
+            if include_filestore:
+                filestore = odoo.tools.config.filestore(dbname)
+                if os.path.exists(filestore):
+                    shutil.copytree(filestore, os.path.join(dump_dir, 'filestore'))
+
+            command = ['7z', 'a', '-bt', '-mx=3', '-mmt=on', '-tzip', os.path.join(zip_dir, zip_filename),
+                       os.path.join(dump_dir, '*')]
+            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            while True:
+                output = process.stdout.readline()
+                if not output and process.poll() is not None:
+                    break
+                if output:
+                    print(output.strip())
+
+            # Check the return code to determine if the process was successful
+            if process.returncode == 0:
+                print("Compression completed successfully")
+
+        _backup_s3(cr, dbname, os.path.join(zip_dir, zip_filename))
+
+
 def _dump_db(dbname, backup):
     cmd = ["pg_dump", "--no-owner", dbname]
     filename = "dump.sql"
     if backup.format in {"dump", "folder"}:
         cmd.insert(-1, "--format=c")
         filename = DBDUMP_FILENAME
-    _logger.info("PG DUMP CALL:" +str(cmd))
+    _logger.info("PG DUMP CALL:" + str(cmd))
     env = exec_pg_environ()
     _logger.info(str(env))
     _stdin, stdout = odoo.tools.exec_pg_command_pipe(*cmd)
@@ -74,7 +114,7 @@ def _backup_s3(cr, dbname, dest):
     ts = datetime.datetime.utcnow().strftime("%Y-%m-%d_%H-%M-%S")
     filename = "%s_%s.%s" % (dbname, ts, 'zip')
     pre = "bkdaily/"
-    _logger.info(str([dest, s3_bucket,pre + filename]))
+    _logger.info(str([dest, s3_bucket, pre + filename]))
     client.upload_file(dest, Bucket=s3_bucket, Key=pre + filename)
     response = client.head_object(Bucket=s3_bucket, Key=pre + filename)
     # Get the size in bytes
@@ -163,18 +203,12 @@ def main(env, dbname, dest, force, if_exists, format, filestore):
                 shutil.rmtree(dest)
     if format == "dump":
         filestore = False
+    ts = datetime.datetime.utcnow().strftime("%Y-%m-%d_%H-%M-%S")
+    filename = "%s_%s.%s" % (dbname, ts, 'zip')
     db = odoo.sql_db.db_connect(dbname)
     try:
-        with backup(
-                format, dest, "w"
-        ) as _backup, db.cursor() as cr, db_management_enabled():
-            if format != "dump":
-                _create_manifest(cr, dbname, _backup)
-            if filestore:
-                _backup_filestore(dbname, _backup)
-            _dump_db(dbname, _backup)
         with db.cursor() as cr:
-            _backup_s3(cr, dbname, dest)
+            _odoo_basic_backup(cr, dbname, filestore, filename)
     except Exception:
         with open(f"{dest.replace('.zip', '_log')}.txt", "w+") as f:
             f.write("======================================\n")
