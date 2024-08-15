@@ -44,7 +44,7 @@ def dump_db_manifest(cr):
 
 
 def _odoo_basic_backup(cr, dbname, include_filestore=False, zip_filename=None):
-    cmd = ["pg_dump", "--no-owner", "-U", "$PGUSER", "-h", "$PGHOST", "-p", 5433, dbname]
+    cmd = ["pg_dump", "--no-owner", "-U", "$PGUSER", "-h", "$PGHOST", "-p", "5433", dbname]
     filename = "dump.sql"
     with tempfile.TemporaryDirectory() as zip_dir:
         with tempfile.TemporaryDirectory() as dump_dir:
