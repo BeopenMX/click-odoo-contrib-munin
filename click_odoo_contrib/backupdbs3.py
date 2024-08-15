@@ -27,23 +27,45 @@ import logging
 _logger = logging.getLogger(__name__)
 
 
+def dump_db_manifest(cr):
+    pg_version = "%d.%d" % divmod(cr._obj.connection.server_version / 100, 100)
+    cr.execute("SELECT name, latest_version FROM ir_module_module WHERE state = 'installed'")
+    modules = dict(cr.fetchall())
+    manifest = {
+        'odoo_dump': '1',
+        'db_name': cr.dbname,
+        'version': odoo.release.version,
+        'version_info': odoo.release.version_info,
+        'major_version': odoo.release.major_version,
+        'pg_version': pg_version,
+        'modules': modules,
+    }
+    return manifest
+
+
 def _odoo_basic_backup(cr, dbname, include_filestore=False, zip_filename=None):
-    cmd = ["pg_dump", "--no-owner", dbname]
+    cmd = ["pg_dump", "--no-owner", "-U", "$PGUSER", "-h", "$PGHOST", "-p", 5433, dbname]
     filename = "dump.sql"
     with tempfile.TemporaryDirectory() as zip_dir:
         with tempfile.TemporaryDirectory() as dump_dir:
             cmd.insert(-1, '--file=' + os.path.join(dump_dir, filename))
-            env = exec_pg_environ()
-            _logger.info(str(env))
+            env = os.environ.copy()
             _logger.info(str(cmd))
+            _logger.info(str(env))
             with open(os.path.join(dump_dir, 'manifest.json'), 'w') as fh:
-                manifest = odoo.service.db.dump_db_manifest(cr)
+                manifest = dump_db_manifest(cr)
                 json.dump(manifest, fh, indent=4)
-            with open(os.devnull) as dn:
-                args2 = tuple(cmd)
-                rc = subprocess.call(args2, env=env, stdout=dn, stderr=subprocess.STDOUT)
-                if rc:
-                    raise Exception('Postgres subprocess %s error %s' % (args2, rc))
+
+            args2 = tuple(cmd)
+            process = subprocess.Popen(args2, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdout, stderr = process.communicate()  # Capture the output and error
+            rc = process.returncode  # Get the return code
+            if rc:
+                error_message = f"Postgres subprocess {args2} error {rc}\n"
+                error_message += f"Stdout:\n{stdout.decode()}\n"
+                error_message += f"Stderr:\n{stderr.decode()}\n"
+                raise Exception(error_message)
+
             if include_filestore:
                 filestore = odoo.tools.config.filestore(dbname)
                 if os.path.exists(filestore):
