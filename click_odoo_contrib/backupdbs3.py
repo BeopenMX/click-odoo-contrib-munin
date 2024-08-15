@@ -46,7 +46,7 @@ def dump_db_manifest(cr):
 def _odoo_basic_backup(cr, dbname, include_filestore=False, zip_filename=None):
     env = os.environ.copy()
 
-    cmd = ["pg_dump", "--no-owner", "-U", env.get("PGUSER"), "-h", env.get("PGHOST"), "-p", "5433", dbname]
+    cmd = ["pg_dump", "--no-owner", "-U", env.get("PGUSER"), "-h", env.get("PGHOST"), "-p", env.get("PGPORT"), dbname]
     filename = "dump.sql"
     with tempfile.TemporaryDirectory() as zip_dir:
         with tempfile.TemporaryDirectory() as dump_dir:
