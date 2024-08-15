@@ -44,12 +44,13 @@ def dump_db_manifest(cr):
 
 
 def _odoo_basic_backup(cr, dbname, include_filestore=False, zip_filename=None):
-    cmd = ["pg_dump", "--no-owner", "-U", "$PGUSER", "-h", "$PGHOST", "-p", "5433", dbname]
+    env = os.environ.copy()
+
+    cmd = ["pg_dump", "--no-owner", "-U", env.get("PGUSER"), "-h", env.get("PHHOST"), "-p", "5433", dbname]
     filename = "dump.sql"
     with tempfile.TemporaryDirectory() as zip_dir:
         with tempfile.TemporaryDirectory() as dump_dir:
             cmd.insert(-1, '--file=' + os.path.join(dump_dir, filename))
-            env = os.environ.copy()
             _logger.info(str(cmd))
             _logger.info(str(env))
             with open(os.path.join(dump_dir, 'manifest.json'), 'w') as fh:
